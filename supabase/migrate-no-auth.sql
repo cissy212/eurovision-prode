@@ -7,13 +7,14 @@
 drop trigger if exists on_auth_user_created on auth.users;
 drop function if exists handle_new_user();
 
--- 2. Recreate profiles without auth.users FK and without email
+-- 2. Drop all tables (order matters for FK constraints)
 drop table if exists scores cascade;
 drop table if exists favourites cascade;
 drop table if exists predictions cascade;
 drop table if exists results cascade;
 drop table if exists room_members cascade;
 drop table if exists rooms cascade;
+drop table if exists contestants cascade;
 drop table if exists profiles cascade;
 
 -- 3. New profiles table — standalone, no auth dependency
