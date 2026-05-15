@@ -6,23 +6,17 @@ export interface Database {
       profiles: {
         Row: {
           id: string
-          email: string
           display_name: string
-          avatar_url: string | null
           created_at: string
         }
         Insert: {
-          id: string
-          email: string
+          id?: string
           display_name: string
-          avatar_url?: string | null
           created_at?: string
         }
         Update: {
           id?: string
-          email?: string
           display_name?: string
-          avatar_url?: string | null
           created_at?: string
         }
       }
@@ -214,6 +208,7 @@ export interface Database {
 
 // Convenience row types
 export type Profile = Database['public']['Tables']['profiles']['Row']
+export type SessionUser = { id: string; display_name: string }
 export type Room = Database['public']['Tables']['rooms']['Row']
 export type RoomMember = Database['public']['Tables']['room_members']['Row']
 export type Contestant = Database['public']['Tables']['contestants']['Row']

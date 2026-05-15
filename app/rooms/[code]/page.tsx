@@ -1,7 +1,7 @@
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getSessionUser } from '@/lib/session'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { InviteCodeDisplay } from '@/components/rooms/invite-code-display'
 import { LockToggle } from '@/components/rooms/lock-toggle'
@@ -13,52 +13,34 @@ export async function generateMetadata({ params }: { params: Promise<{ code: str
 
 export default async function RoomPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
 
   const service = await createServiceClient()
 
-  // Get room
-  const { data: room, error } = await service
-    .from('rooms')
-    .select('*')
-    .eq('invite_code', code.toUpperCase())
-    .single()
+  const { data: room } = await service
+    .from('rooms').select('*').eq('invite_code', code.toUpperCase()).single()
 
-  if (error || !room) notFound()
+  if (!room) notFound()
 
-  // Check membership
   const { data: membership } = await service
-    .from('room_members')
-    .select('id')
-    .eq('room_id', room.id)
-    .eq('user_id', user.id)
-    .single()
+    .from('room_members').select('id').eq('room_id', room.id).eq('user_id', user.id).single()
 
   if (!membership) redirect('/dashboard')
 
-  // Get members with profiles
   const { data: members } = await service
     .from('room_members')
     .select('user_id, joined_at, profiles(display_name)')
     .eq('room_id', room.id)
     .order('joined_at', { ascending: true })
 
-  // Get predictions count per user
   const { data: predictions } = await service
-    .from('predictions')
-    .select('user_id')
-    .eq('room_id', room.id)
+    .from('predictions').select('user_id').eq('room_id', room.id)
 
   const usersWithPredictions = new Set((predictions ?? []).map((p) => p.user_id))
 
-  // Check if results exist
   const { data: results } = await service
-    .from('results')
-    .select('id')
-    .eq('room_id', room.id)
-    .limit(1)
+    .from('results').select('id').eq('room_id', room.id).limit(1)
 
   const hasResults = (results ?? []).length > 0
   const isAdmin = room.admin_user_id === user.id
@@ -66,53 +48,37 @@ export default async function RoomPage({ params }: { params: Promise<{ code: str
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 space-y-8">
-      {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Link href="/dashboard" className="text-purple-400 hover:text-purple-200 text-sm transition-colors">
-              ← Dashboard
-            </Link>
-          </div>
-          <h1 className="text-3xl font-extrabold text-white">{room.name}</h1>
-          <div className="flex gap-2 mt-2">
-            {isAdmin && <Badge variant="gold">👑 You're the admin</Badge>}
-            {room.locked ? (
-              <Badge variant="danger">🔒 Predictions locked</Badge>
-            ) : (
-              <Badge variant="success">🟢 Predictions open</Badge>
-            )}
+          <Link href="/dashboard" className="text-purple-400 hover:text-purple-200 text-sm transition-colors">← Dashboard</Link>
+          <h1 className="text-3xl font-extrabold text-white mt-1">{room.name}</h1>
+          <div className="flex gap-2 mt-2 flex-wrap">
+            {isAdmin && <Badge variant="gold">👑 You&apos;re the admin</Badge>}
+            {room.locked ? <Badge variant="danger">🔒 Predictions locked</Badge> : <Badge variant="success">🟢 Predictions open</Badge>}
             {hasResults && <Badge variant="gold">🏆 Results published</Badge>}
           </div>
         </div>
       </div>
 
-      {/* Invite code */}
       <div className="glass-card rounded-2xl p-6 space-y-2">
         <p className="text-sm text-purple-400 font-medium">Invite code — share with friends</p>
         <InviteCodeDisplay code={room.invite_code} />
       </div>
 
-      {/* Lock banner */}
       {room.locked && !hasResults && (
         <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-5 py-4 text-sm text-red-300">
           🔒 <strong>Predictions are locked.</strong> The competition has started — no more changes allowed.
         </div>
       )}
 
-      {/* Navigation */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Link href={`/rooms/${code}/predict`} className="block">
           <div className={`glass-card rounded-xl p-4 text-center space-y-1 hover:border-purple-400/60 transition-all ${room.locked ? 'opacity-60' : ''}`}>
             <div className="text-2xl">🎯</div>
             <div className="text-sm font-semibold text-white">Predict</div>
-            {userHasPredictions ? (
-              <div className="text-xs text-green-400">✓ Done</div>
-            ) : room.locked ? (
-              <div className="text-xs text-red-400">Locked</div>
-            ) : (
-              <div className="text-xs text-yellow-400">Pending</div>
-            )}
+            {userHasPredictions ? <div className="text-xs text-green-400">✓ Done</div>
+              : room.locked ? <div className="text-xs text-red-400">Locked</div>
+              : <div className="text-xs text-yellow-400">Pending</div>}
           </div>
         </Link>
 
@@ -145,22 +111,16 @@ export default async function RoomPage({ params }: { params: Promise<{ code: str
         )}
       </div>
 
-      {/* Admin controls */}
       {isAdmin && (
         <div className="glass-card rounded-2xl p-5 space-y-3">
           <h2 className="font-semibold text-purple-200 text-sm uppercase tracking-wider">Admin controls</h2>
           <LockToggle roomId={room.id} locked={room.locked} />
-          <p className="text-xs text-purple-500">
-            Lock predictions before the show starts. Unlock to allow changes.
-          </p>
+          <p className="text-xs text-purple-500">Lock predictions before the show starts. Unlock to allow changes.</p>
         </div>
       )}
 
-      {/* Members list */}
       <div className="glass-card rounded-2xl p-5 space-y-4">
-        <h2 className="font-semibold text-purple-200 text-sm uppercase tracking-wider">
-          Members ({members?.length ?? 0})
-        </h2>
+        <h2 className="font-semibold text-purple-200 text-sm uppercase tracking-wider">Members ({members?.length ?? 0})</h2>
         <ul className="space-y-2">
           {(members ?? []).map((m) => {
             const profile = m.profiles as unknown as { display_name: string } | null
@@ -178,11 +138,7 @@ export default async function RoomPage({ params }: { params: Promise<{ code: str
                   </span>
                   {isMemberAdmin && <Badge variant="gold">👑</Badge>}
                 </div>
-                {hasPreds ? (
-                  <Badge variant="success">✓ Predicted</Badge>
-                ) : (
-                  <Badge variant="warning">Pending</Badge>
-                )}
+                {hasPreds ? <Badge variant="success">✓ Predicted</Badge> : <Badge variant="warning">Pending</Badge>}
               </li>
             )
           })}

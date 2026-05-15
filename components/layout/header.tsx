@@ -1,17 +1,10 @@
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import { getSessionUser } from '@/lib/session'
 import { signOut } from '@/app/actions/auth'
 import { Button } from '@/components/ui/button'
 
 export async function Header() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  let profile = null
-  if (user) {
-    const { data } = await supabase.from('profiles').select('display_name').eq('id', user.id).single()
-    profile = data
-  }
+  const user = await getSessionUser()
 
   return (
     <header className="sticky top-0 z-50 border-b border-purple-500/20 bg-purple-950/80 backdrop-blur-md">
@@ -30,13 +23,9 @@ export async function Header() {
                 Dashboard
               </Link>
               <span className="text-purple-600">|</span>
-              <span className="text-sm text-purple-300 font-medium">
-                {profile?.display_name ?? user.email?.split('@')[0]}
-              </span>
+              <span className="text-sm text-purple-300 font-medium">{user.display_name}</span>
               <form action={signOut}>
-                <Button type="submit" variant="ghost" size="sm">
-                  Sign out
-                </Button>
+                <Button type="submit" variant="ghost" size="sm">Sign out</Button>
               </form>
             </>
           ) : (

@@ -1,4 +1,5 @@
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getSessionUser } from '@/lib/session'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ContestantCard } from '@/components/contestants/contestant-card'
@@ -13,8 +14,7 @@ export async function generateMetadata({ params }: { params: Promise<{ code: str
 
 export default async function RecapPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
 
   const service = await createServiceClient()
