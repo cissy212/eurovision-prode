@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ContestantCard } from '@/components/contestants/contestant-card'
@@ -17,7 +17,9 @@ export default async function RecapPage({ params }: { params: Promise<{ code: st
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: room } = await supabase
+  const service = await createServiceClient()
+
+  const { data: room } = await service
     .from('rooms')
     .select('*')
     .eq('invite_code', code.toUpperCase())
@@ -26,7 +28,7 @@ export default async function RecapPage({ params }: { params: Promise<{ code: st
   if (!room) notFound()
 
   // Check membership
-  const { data: membership } = await supabase
+  const { data: membership } = await service
     .from('room_members')
     .select('id')
     .eq('room_id', room.id)
@@ -36,7 +38,7 @@ export default async function RecapPage({ params }: { params: Promise<{ code: st
   if (!membership) redirect('/dashboard')
 
   // Get official results
-  const { data: results } = await supabase
+  const { data: results } = await service
     .from('results')
     .select('rank, contestant_id, contestants(*)')
     .eq('room_id', room.id)
@@ -55,12 +57,12 @@ export default async function RecapPage({ params }: { params: Promise<{ code: st
   }
 
   // Get all members, scores, predictions
-  const { data: members } = await supabase
+  const { data: members } = await service
     .from('room_members')
     .select('user_id, profiles(display_name)')
     .eq('room_id', room.id)
 
-  const { data: scores } = await supabase
+  const { data: scores } = await service
     .from('scores')
     .select('*')
     .eq('room_id', room.id)
@@ -74,14 +76,14 @@ export default async function RecapPage({ params }: { params: Promise<{ code: st
 
   // Get predictions for all members
   const memberIds = sortedMembers.map((m) => m.user_id)
-  const { data: allPredictions } = await supabase
+  const { data: allPredictions } = await service
     .from('predictions')
     .select('user_id, rank, contestant_id')
     .eq('room_id', room.id)
     .in('user_id', memberIds)
 
   // Get favourites for all members
-  const { data: allFavourites } = await supabase
+  const { data: allFavourites } = await service
     .from('favourites')
     .select('user_id, contestant_id')
     .eq('room_id', room.id)

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -17,8 +17,10 @@ export default async function RoomPage({ params }: { params: Promise<{ code: str
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const service = await createServiceClient()
+
   // Get room
-  const { data: room, error } = await supabase
+  const { data: room, error } = await service
     .from('rooms')
     .select('*')
     .eq('invite_code', code.toUpperCase())
@@ -27,27 +29,24 @@ export default async function RoomPage({ params }: { params: Promise<{ code: str
   if (error || !room) notFound()
 
   // Check membership
-  const { data: membership } = await supabase
+  const { data: membership } = await service
     .from('room_members')
     .select('id')
     .eq('room_id', room.id)
     .eq('user_id', user.id)
     .single()
 
-  if (!membership) {
-    // Auto-join? For now redirect to dashboard
-    redirect('/dashboard')
-  }
+  if (!membership) redirect('/dashboard')
 
   // Get members with profiles
-  const { data: members } = await supabase
+  const { data: members } = await service
     .from('room_members')
     .select('user_id, joined_at, profiles(display_name)')
     .eq('room_id', room.id)
     .order('joined_at', { ascending: true })
 
   // Get predictions count per user
-  const { data: predictions } = await supabase
+  const { data: predictions } = await service
     .from('predictions')
     .select('user_id')
     .eq('room_id', room.id)
@@ -55,7 +54,7 @@ export default async function RoomPage({ params }: { params: Promise<{ code: str
   const usersWithPredictions = new Set((predictions ?? []).map((p) => p.user_id))
 
   // Check if results exist
-  const { data: results } = await supabase
+  const { data: results } = await service
     .from('results')
     .select('id')
     .eq('room_id', room.id)

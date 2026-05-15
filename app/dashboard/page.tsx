@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { RoomCard } from '@/components/rooms/room-card'
 import { DashboardActions } from '@/components/rooms/dashboard-actions'
@@ -12,15 +12,17 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const service = await createServiceClient()
+
   // Get profile
-  const { data: profile } = await supabase
+  const { data: profile } = await service
     .from('profiles')
     .select('display_name')
     .eq('id', user.id)
     .single()
 
   // Get rooms the user is a member of
-  const { data: memberships } = await supabase
+  const { data: memberships } = await service
     .from('room_members')
     .select('room_id, joined_at')
     .eq('user_id', user.id)
@@ -35,7 +37,7 @@ export default async function DashboardPage() {
   }> = []
 
   if (roomIds.length > 0) {
-    const { data: roomData } = await supabase
+    const { data: roomData } = await service
       .from('rooms')
       .select('*')
       .in('id', roomIds)
@@ -43,13 +45,13 @@ export default async function DashboardPage() {
 
     if (roomData) {
       // Get member counts for all rooms
-      const { data: allMembers } = await supabase
+      const { data: allMembers } = await service
         .from('room_members')
         .select('room_id')
         .in('room_id', roomIds)
 
       // Get user's predictions (to know if they've submitted)
-      const { data: userPredictions } = await supabase
+      const { data: userPredictions } = await service
         .from('predictions')
         .select('room_id')
         .eq('user_id', user.id)

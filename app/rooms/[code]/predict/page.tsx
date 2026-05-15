@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { PredictionForm } from '@/components/predictions/prediction-form'
@@ -14,8 +14,10 @@ export default async function PredictPage({ params }: { params: Promise<{ code: 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const service = await createServiceClient()
+
   // Get room
-  const { data: room } = await supabase
+  const { data: room } = await service
     .from('rooms')
     .select('*')
     .eq('invite_code', code.toUpperCase())
@@ -24,7 +26,7 @@ export default async function PredictPage({ params }: { params: Promise<{ code: 
   if (!room) notFound()
 
   // Check membership
-  const { data: membership } = await supabase
+  const { data: membership } = await service
     .from('room_members')
     .select('id')
     .eq('room_id', room.id)
@@ -34,20 +36,20 @@ export default async function PredictPage({ params }: { params: Promise<{ code: 
   if (!membership) redirect('/dashboard')
 
   // Get all contestants ordered by running order
-  const { data: contestants } = await supabase
+  const { data: contestants } = await service
     .from('contestants')
     .select('*')
     .order('running_order', { ascending: true })
 
   // Get existing predictions
-  const { data: predictions } = await supabase
+  const { data: predictions } = await service
     .from('predictions')
     .select('rank, contestant_id')
     .eq('user_id', user.id)
     .eq('room_id', room.id)
 
   // Get existing favourites
-  const { data: favourites } = await supabase
+  const { data: favourites } = await service
     .from('favourites')
     .select('contestant_id')
     .eq('user_id', user.id)

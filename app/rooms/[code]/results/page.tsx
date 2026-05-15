@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ResultsForm } from '@/components/predictions/results-form'
@@ -14,7 +14,9 @@ export default async function ResultsPage({ params }: { params: Promise<{ code: 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: room } = await supabase
+  const service = await createServiceClient()
+
+  const { data: room } = await service
     .from('rooms')
     .select('*')
     .eq('invite_code', code.toUpperCase())
@@ -23,12 +25,12 @@ export default async function ResultsPage({ params }: { params: Promise<{ code: 
   if (!room) notFound()
   if (room.admin_user_id !== user.id) redirect(`/rooms/${code}`)
 
-  const { data: contestants } = await supabase
+  const { data: contestants } = await service
     .from('contestants')
     .select('*')
     .order('running_order', { ascending: true })
 
-  const { data: existingResults } = await supabase
+  const { data: existingResults } = await service
     .from('results')
     .select('rank, contestant_id')
     .eq('room_id', room.id)

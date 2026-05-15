@@ -147,74 +147,33 @@ create policy "profiles_update" on profiles for update using (auth.uid() = id);
 -- Contestants: public read
 create policy "contestants_select" on contestants for select using (true);
 
--- Rooms: members can read; anyone authenticated can insert (create a room)
-create policy "rooms_select" on rooms for select
-  using (
-    auth.uid() = admin_user_id
-    or exists (
-      select 1 from room_members rm where rm.room_id = id and rm.user_id = auth.uid()
-    )
-  );
+-- Rooms: admin can always read; members can read via a security definer function
 create policy "rooms_insert" on rooms for insert with check (auth.uid() = admin_user_id);
 create policy "rooms_update" on rooms for update using (auth.uid() = admin_user_id);
+create policy "rooms_select" on rooms for select using (auth.uid() = admin_user_id);
 
--- Room members: members can read; authenticated users can insert themselves
-create policy "room_members_select" on room_members for select
-  using (
-    auth.uid() = user_id
-    or exists (
-      select 1 from room_members rm2 where rm2.room_id = room_id and rm2.user_id = auth.uid()
-    )
-  );
+-- Room members: users can only see their own membership rows
+-- (the app fetches all members server-side using the service role)
+create policy "room_members_select" on room_members for select using (auth.uid() = user_id);
 create policy "room_members_insert" on room_members for insert with check (auth.uid() = user_id);
 
--- Predictions: user can CRUD their own; room members can read all
-create policy "predictions_select" on predictions for select
-  using (
-    exists (
-      select 1 from room_members rm where rm.room_id = room_id and rm.user_id = auth.uid()
-    )
-  );
+-- Predictions: users manage their own; all reads done server-side via service role
+create policy "predictions_select" on predictions for select using (auth.uid() = user_id);
 create policy "predictions_insert" on predictions for insert with check (auth.uid() = user_id);
 create policy "predictions_update" on predictions for update using (auth.uid() = user_id);
 create policy "predictions_delete" on predictions for delete using (auth.uid() = user_id);
 
--- Favourites: same pattern as predictions
-create policy "favourites_select" on favourites for select
-  using (
-    exists (
-      select 1 from room_members rm where rm.room_id = room_id and rm.user_id = auth.uid()
-    )
-  );
+-- Favourites: users manage their own; all reads done server-side via service role
+create policy "favourites_select" on favourites for select using (auth.uid() = user_id);
 create policy "favourites_insert" on favourites for insert with check (auth.uid() = user_id);
 create policy "favourites_delete" on favourites for delete using (auth.uid() = user_id);
 
--- Results: room members can read; admin can insert/update (enforced in app layer)
-create policy "results_select" on results for select
-  using (
-    exists (
-      select 1 from room_members rm where rm.room_id = room_id and rm.user_id = auth.uid()
-    )
-  );
-create policy "results_insert" on results for insert
-  with check (
-    exists (
-      select 1 from rooms r where r.id = room_id and r.admin_user_id = auth.uid()
-    )
-  );
-create policy "results_update" on results for update
-  using (
-    exists (
-      select 1 from rooms r where r.id = room_id and r.admin_user_id = auth.uid()
-    )
-  );
+-- Results: authenticated users can read; admin enforced in app layer
+create policy "results_select" on results for select using (auth.uid() is not null);
+create policy "results_insert" on results for insert with check (auth.uid() is not null);
+create policy "results_update" on results for update using (auth.uid() is not null);
 
--- Scores: room members can read
-create policy "scores_select" on scores for select
-  using (
-    exists (
-      select 1 from room_members rm where rm.room_id = room_id and rm.user_id = auth.uid()
-    )
-  );
+-- Scores: authenticated users can read; service role writes
+create policy "scores_select" on scores for select using (auth.uid() is not null);
 create policy "scores_upsert" on scores for insert with check (true);
 create policy "scores_update" on scores for update using (true);

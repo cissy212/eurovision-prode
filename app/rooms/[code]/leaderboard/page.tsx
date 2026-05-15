@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { LeaderboardTable } from '@/components/leaderboard/leaderboard-table'
@@ -15,7 +15,9 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ co
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: room } = await supabase
+  const service = await createServiceClient()
+
+  const { data: room } = await service
     .from('rooms')
     .select('*')
     .eq('invite_code', code.toUpperCase())
@@ -24,7 +26,7 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ co
   if (!room) notFound()
 
   // Check membership
-  const { data: membership } = await supabase
+  const { data: membership } = await service
     .from('room_members')
     .select('id')
     .eq('room_id', room.id)
@@ -34,19 +36,19 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ co
   if (!membership) redirect('/dashboard')
 
   // Get all members with profiles
-  const { data: members } = await supabase
+  const { data: members } = await service
     .from('room_members')
     .select('user_id, profiles(display_name)')
     .eq('room_id', room.id)
 
   // Get scores (if results published)
-  const { data: scores } = await supabase
+  const { data: scores } = await service
     .from('scores')
     .select('*')
     .eq('room_id', room.id)
 
   // Get which users have predictions
-  const { data: predictions } = await supabase
+  const { data: predictions } = await service
     .from('predictions')
     .select('user_id')
     .eq('room_id', room.id)
